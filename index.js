@@ -4,12 +4,13 @@ const mongoose = require('mongoose');
 const User = require('./models/User.js');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-
-
+const cors = require('cors');
 
 const app = express(); // here i have initialized the express package
 
 // middleware
+
+app.use(cors())  
 
 app.set('view engine', 'ejs') // by using this i was set the ejs as template engine
 
@@ -71,61 +72,76 @@ app.delete('/profile', (req, res) => {
     res.send('delete is trigered')
 })
 
-app.get('/register', (req, res) => {
-    res.render('register')
-})
+// app.get('/register', (req, res) => {
+//     res.render('register')
+// })
 
-app.post('/register',  async (req, res) => {
-    console.log(req.body)
+app.post('/register', async (req, res) => {
+    try {
+        console.log(req.body)
 
-    const { username, email, password } = req.body // obj destructuring
+        const {email, password } = req.body // obj destructuring
+        
+        // if(username){
+        //     username = username.trim()
+        // }
 
+        if(password.length < 6){
+            res.status(400).send("password length is greater than 6")
+        }
+        
+        const hashPassword = await bcrypt.hash(password, 10)
 
-    const hashPassword = await bcrypt.hash(password,10)
+        const newUser = new User({email, password: hashPassword });
 
-    const newUser = new User({username, email, password : hashPassword });
+        await newUser.save(); // it is saying that i will await for sometime until the collection created
 
-    await newUser.save(); // it is saying that i will await for sometime until the collection created
+        console.log(newUser);
 
-    console.log(newUser);
+        res.send(`hi, thanks for registering with ${email}`)
+    } catch (error) {
 
-    res.send(`hi ${username} , thanks for registering with ${email}`)
+        if(error.code == 11000){
+            res.status(500).send("Email adrress already exists")
+        }
+        console.log(error,"error")
+        res.status(500).send('Error while registering')
+    }
+    
 })
 
 // app.get('/login', (req, res) => {
 //     res.render('login')
 // })
 
-app.post('/login',  async (req, res) => {
+app.post('/login', async (req, res) => {
 
     console.log(req.body)
 
     const { email, password } = req.body // obj destructuring
 
-    const useravailable = await User.findOne({email});
+    const useravailable = await User.findOne({ email });
 
-    console.log(useravailable,'Useravailable')
+    console.log(useravailable, 'Useravailable')
 
-    if(!useravailable){
+    if (!useravailable) {
         return res.status(400).send("Invalid email or user not found")
     }
 
-    const isMatching = await bcrypt.compare(password,useravailable.password)
+    const isMatching = await bcrypt.compare(password, useravailable.password)
 
-    if(!isMatching){
+    if (!isMatching) {
         return res.status(400).send('Password is incorrect')
     }
 
     const SECRET_KEY = 'sadhik123'
     const token = jwt.sign({
-        id : useravailable._id, email : useravailable.email, username : useravailable.username
-    }, SECRET_KEY, {expiresIn : '1m'})
-
-
+        id: useravailable._id, email: useravailable.email, username: useravailable.username
+    }, SECRET_KEY, { expiresIn: '1m' })
 
     res.status(200).send({
-        message : 'Login successful',
-        token : token
+        message: 'Login successful',
+        token: token
     })
 
 })
